@@ -20,7 +20,7 @@ singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /bin/bash -c "
         bash $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/setup_env.sh &&
 
-        cd $SCRATCH/qwen3-vl-efficiency &&
+        cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
 
         echo '=== [1/4] MMMU ===' &&
         python -m eval.eval_mmmu_divprune --subset_ratio 0.5 &&
