@@ -1,0 +1,6 @@
+git+https://github.com/huggingface/transformers
+torch 
+torchvision 
+accelerate 
+pillow 
+requests

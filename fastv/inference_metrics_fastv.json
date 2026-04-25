@@ -1,0 +1,32 @@
+{
+  "model": "Qwen/Qwen3-VL-4B-Instruct",
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "gpu_peak_tflops": 312000000000000.0,
+  "gpu_peak_bw_gbps": 2000000000000.0,
+  "total_params_B": 4.438,
+  "fastv_enabled": true,
+  "fastv_k": 3,
+  "fastv_r": 0.5,
+  "aggregated": {
+    "n_samples": 847,
+    "mean_e2e_ms": 276.66179075324624,
+    "mean_ttft_ms": 93.2522776186525,
+    "mean_tpot_ms": 68.94061394441574,
+    "mean_prefill_ms": 93.2522776186525,
+    "mean_decode_ms": 257.60581134120474,
+    "mean_prefill_tok_s": 4480.414889665491,
+    "mean_decode_tok_s": 14.634406167915179,
+    "mean_image_tokens": 296.5844155844156,
+    "mean_input_tokens": 412.5123966942149,
+    "mean_output_tokens": 4.311688311688312,
+    "mean_peak_vram_mb": 8885.957522587953,
+    "mean_kvcache_mb": 60.82742796694214,
+    "mean_mfu_pct": 38.74014964142761,
+    "mean_arith_intensity": 1244.0327631712134,
+    "mean_sm_util_pct": 35.616153439153415,
+    "mean_mem_bw_util_pct": 11.871765535086714,
+    "p95_e2e_ms": 1675.0125609999884,
+    "p95_ttft_ms": 96.16762599995354,
+    "p95_decode_tok_s": 19.198849896736437
+  }
+}

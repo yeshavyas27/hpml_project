@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+results/*.json
+results/*.jsonl
+results/*.csv
+.DS_Store
+.cache/
+hf_cache/

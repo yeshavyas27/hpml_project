@@ -1,0 +1,30 @@
+{
+  "model": "Qwen/Qwen3-VL-4B-Instruct",
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "gpu_peak_tflops": 312000000000000.0,
+  "gpu_peak_bw_gbps": 2000000000000.0,
+  "total_params_B": 4.438,
+  "aggregated": {
+    "n_samples": 847,
+    "mean_e2e_ms": 272.0941572703671,
+    "mean_ttft_ms": 92.37127067178288,
+    "mean_tpot_ms": 67.99351698669294,
+    "mean_prefill_ms": 92.37127067178288,
+    "mean_decode_ms": 253.99186898819437,
+    "mean_prefill_tok_s": 4545.961093927013,
+    "mean_decode_tok_s": 14.8399419220125,
+    "mean_image_tokens": 296.5844155844156,
+    "mean_input_tokens": 412.5123966942149,
+    "mean_output_tokens": 4.311688311688312,
+    "mean_peak_vram_mb": 8885.95694953483,
+    "mean_kvcache_mb": 0.0,
+    "mean_mfu_pct": 39.30689844127118,
+    "mean_arith_intensity": 1253.8205741626793,
+    "mean_sm_util_pct": 35.121343639444035,
+    "mean_mem_bw_util_pct": 11.67568681898501,
+    "p95_e2e_ms": 1649.932008999997,
+    "p95_ttft_ms": 95.39219699999535,
+    "p95_decode_tok_s": 19.452154032149274
+  },
+  "by_subject_perf": {}
+}
