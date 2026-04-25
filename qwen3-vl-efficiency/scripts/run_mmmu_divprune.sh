@@ -17,4 +17,9 @@ export HF_HOME=$SCRATCH/hf_cache
 
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /scratch/work/public/singularity/cuda12.2.2-cudnn8.9.4-devel-ubuntu22.04.3.sif \
-    /bin/bash -c "cd $SCRATCH/qwen3-vl-efficiency && python -m eval.eval_mmmu_divprune --subset_ratio 0.5"
+    /bin/bash -c "
+        pip install torch torchvision accelerate pillow requests tqdm numpy datasets kvpress &&
+        pip install 'git+https://github.com/huggingface/transformers' &&
+        cd $SCRATCH/qwen3-vl-efficiency &&
+        python -m eval.eval_mmmu_divprune --subset_ratio 0.5
+    "
