@@ -20,5 +20,5 @@ singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /bin/bash -c "
         bash $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/setup_env.sh &&
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
-        python -m eval.eval_realworldqa_divprune --subset_ratio 0.5
+        python3 -m eval.eval_realworldqa_divprune --subset_ratio 0.5
     "

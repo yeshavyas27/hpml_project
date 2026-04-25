@@ -23,16 +23,16 @@ singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
 
         echo '=== [1/4] MMMU ===' &&
-        python -m eval.eval_mmmu_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_mmmu_divprune --subset_ratio 0.5 &&
 
         echo '=== [2/4] DocVQA ===' &&
-        python -m eval.eval_docvqa_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_docvqa_divprune --subset_ratio 0.5 &&
 
         echo '=== [3/4] MathVista ===' &&
-        python -m eval.eval_mathvista_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_mathvista_divprune --subset_ratio 0.5 &&
 
         echo '=== [4/4] RealWorldQA ===' &&
-        python -m eval.eval_realworldqa_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_realworldqa_divprune --subset_ratio 0.5 &&
 
         echo '=== All done. Results in results/divprune/ ==='
     "
