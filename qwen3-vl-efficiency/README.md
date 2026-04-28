@@ -29,11 +29,31 @@ Prefill latency scales with image token count. DocVQA is most expensive (3600+ i
 
 ## Setup
 
+### Local / standard environment
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+### NYU Greene (Singularity)
+
+Install once inside the singularity overlay, then submit jobs directly — no `setup_env.sh` needed.
+
+```bash
+# Open an interactive shell inside the container
+singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
+    /scratch/work/public/singularity/cuda12.2.2-cudnn8.9.4-devel-ubuntu22.04.3.sif \
+    /bin/bash
+
+# Inside the container — install dependencies
+pip3 install torch>=2.4.0 torchvision --index-url https://download.pytorch.org/whl/cu121
+pip3 install accelerate
+pip3 install -r $SCRATCH/hpml_project/qwen3-vl-efficiency/requirements.txt
+pip3 install 'git+https://github.com/huggingface/transformers'
+exit
 ```
 
 ---
@@ -220,6 +240,51 @@ At `compression_ratio=0.5` we expect:
 
 DocVQA should show the largest efficiency gain because it has the most image
 tokens (3600+), giving H2O the most tokens to evict.
+
+---
+
+## Milestone 2: DivPrune Visual Token Pruning
+
+DivPrune greedily selects a **diverse subset** of image tokens (max-min cosine distance) before the first LLM layer, reducing sequence length and prefill cost.
+
+### Run on NYU Greene (sbatch)
+
+Run all 4 benchmarks in one job (sweeps ratios 0.1 / 0.2 / 0.3 / 0.5 by default):
+
+```bash
+sbatch $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/run_all_divprune.sh
+```
+
+Or submit individual benchmark jobs:
+
+```bash
+sbatch $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/run_mmmu_divprune.sh
+sbatch $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/run_docvqa_divprune.sh
+sbatch $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/run_mathvista_divprune.sh
+sbatch $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/run_realworldqa_divprune.sh
+```
+
+Monitor jobs:
+
+```bash
+squeue -u $USER
+tail -f divprune_all_<jobid>.out
+```
+
+### Run locally
+
+```bash
+# sweep ratios [0.1, 0.2, 0.3, 0.5]
+python3 -m eval.eval_mmmu_divprune
+
+# single ratio
+python3 -m eval.eval_mmmu_divprune --subset_ratio 0.3
+
+# baseline (no pruning)
+python3 -m eval.eval_mmmu_divprune --no_divprune
+```
+
+Results are saved to `results/divprune/` as `<benchmark>_r<ratio>.jsonl` (e.g. `mmmu_r0p50.jsonl`).
 
 ---
 
