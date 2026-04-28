@@ -49,7 +49,7 @@ singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /bin/bash
 
 # Inside the container — install dependencies
-pip3 install torch>=2.4.0 torchvision --index-url https://download.pytorch.org/whl/cu121
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 pip3 install accelerate
 pip3 install -r $SCRATCH/hpml_project/qwen3-vl-efficiency/requirements.txt
 pip3 install 'git+https://github.com/huggingface/transformers'
