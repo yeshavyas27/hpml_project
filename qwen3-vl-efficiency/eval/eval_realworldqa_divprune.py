@@ -17,7 +17,7 @@ from transformers import TextIteratorStreamer
 from src.load_model import load_model_and_processor
 from src.utils import reset_gpu_memory, get_peak_gpu_memory_mb
 from src.divprune import (
-    DivPruneConfig, apply_divprune_to_qwen,
+    DivPruneConfig, apply_divprune_to_qwen, remove_divprune,
     get_divprune_stats, is_divprune_active,
 )
 
@@ -93,49 +93,35 @@ def generate_with_timing(model, processor, image, question: str):
     return prediction, prefill_ms, decode_ms, num_tokens, throughput
 
 
+DEFAULT_RATIOS = [0.1, 0.2, 0.3, 0.5]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="RealWorldQA evaluation with DivPrune.")
-    parser.add_argument("--subset_ratio", type=float, default=0.5)
+    parser.add_argument("--subset_ratio", type=float, default=None,
+                        help="Single ratio to evaluate. If omitted, sweeps DEFAULT_RATIOS.")
+    parser.add_argument("--sweep_ratios", type=float, nargs="+", default=DEFAULT_RATIOS)
     parser.add_argument("--no_divprune", action="store_true")
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--verbose", action="store_true")
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-
-    tag = "baseline" if args.no_divprune else f"r{args.subset_ratio:.2f}".replace(".", "p")
-    results_dir = "results/divprune"
-    os.makedirs(results_dir, exist_ok=True)
+def run_ratio(model, processor, dataset, ratio, max_samples, verbose, results_dir):
+    tag = "baseline" if ratio is None else f"r{ratio:.2f}".replace(".", "p")
     results_path = f"{results_dir}/realworldqa_{tag}.jsonl"
 
     print("=" * 80)
-    print("RealWorldQA Evaluation — DivPrune")
+    print(f"RealWorldQA Evaluation — DivPrune  |  ratio={'baseline' if ratio is None else ratio}")
     print("=" * 80)
-    print(f"  DivPrune       : {'disabled (baseline)' if args.no_divprune else 'enabled'}")
-    if not args.no_divprune:
-        print(f"  Subset ratio   : {args.subset_ratio}")
-    print(f"  Results path   : {results_path}")
-    print()
 
-    print("Loading model...")
-    model, processor = load_model_and_processor()
-
-    if not args.no_divprune:
-        config = DivPruneConfig(
-            use_divprune=True,
-            divprune_r=args.subset_ratio,
-            verbose=args.verbose,
-        )
+    if ratio is not None:
+        config = DivPruneConfig(use_divprune=True, divprune_r=ratio, verbose=verbose)
         apply_divprune_to_qwen(model, config)
-
-    print(f"Loading dataset: {DATASET_HF} / {SPLIT}...")
-    dataset = load_dataset(DATASET_HF, split=SPLIT)
 
     n_correct = 0
     n_total = 0
-    limit = args.max_samples if args.max_samples else len(dataset)
+    limit = max_samples if max_samples else len(dataset)
 
     with open(results_path, "w") as f:
         for idx in range(min(limit, len(dataset))):
@@ -171,7 +157,7 @@ def main():
             row = {
                 "sample_id": idx,
                 "dataset": "realworldqa",
-                "subset_ratio": args.subset_ratio if not args.no_divprune else None,
+                "subset_ratio": ratio,
                 "question": question,
                 "ground_truth": ground_truth,
                 "prediction": prediction,
@@ -195,9 +181,51 @@ def main():
             )
 
     accuracy = n_correct / n_total if n_total > 0 else 0.0
+    print(f"Accuracy : {n_correct}/{n_total} = {accuracy:.1%}  |  Results: {results_path}")
+
+    if ratio is not None:
+        remove_divprune(model)
+
+    return accuracy, results_path
+
+
+def main():
+    args = parse_args()
+
+    results_dir = "results/divprune"
+    os.makedirs(results_dir, exist_ok=True)
+
+    print("Loading model...")
+    model, processor = load_model_and_processor()
+
+    print(f"Loading dataset: {DATASET_HF} / {SPLIT}...")
+    dataset = load_dataset(DATASET_HF, split=SPLIT)
+
+    if args.no_divprune:
+        ratios = [None]
+    elif args.subset_ratio is not None:
+        ratios = [args.subset_ratio]
+    else:
+        ratios = args.sweep_ratios
+
+    print(f"\nRatios to evaluate: {['baseline' if r is None else r for r in ratios]}\n")
+
+    summary = []
+    for ratio in ratios:
+        accuracy, results_path = run_ratio(
+            model, processor, dataset, ratio,
+            args.max_samples, args.verbose, results_dir,
+        )
+        summary.append({"ratio": ratio, "accuracy": accuracy, "results": results_path})
+
+    print("\n" + "=" * 80)
+    print("SWEEP SUMMARY")
     print("=" * 80)
-    print(f"Accuracy : {n_correct}/{n_total} = {accuracy:.1%}")
-    print(f"Results  : {results_path}")
+    print(f"{'Ratio':<10}  {'Accuracy':>10}")
+    print("-" * 22)
+    for entry in summary:
+        label = "baseline" if entry["ratio"] is None else f"{entry['ratio']:.2f}"
+        print(f"{label:<10}  {entry['accuracy']:>10.1%}")
     print("=" * 80)
 
 
