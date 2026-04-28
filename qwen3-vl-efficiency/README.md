@@ -45,7 +45,7 @@ Install once inside the singularity overlay, then submit jobs directly — no `s
 ```bash
 # Open an interactive shell inside the container
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
-    /scratch/work/public/singularity/cuda12.2.2-cudnn8.9.4-devel-ubuntu22.04.3.sif \
+    /scratch/work/public/singularity/cuda12.6.3-cudnn9.5.1-ubuntu22.04.5.sif \
     /bin/bash
 
 # Inside the container — install dependencies
