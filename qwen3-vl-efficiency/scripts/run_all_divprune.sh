@@ -18,21 +18,19 @@ export HF_HOME=$SCRATCH/hf_cache
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /scratch/work/public/singularity/cuda12.2.2-cudnn8.9.4-devel-ubuntu22.04.3.sif \
     /bin/bash -c "
-        bash $SCRATCH/hpml_project/qwen3-vl-efficiency/scripts/setup_env.sh &&
-
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
 
         echo '=== [1/4] MMMU ===' &&
-        python3 -m eval.eval_mmmu_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_mmmu_divprune &&
 
         echo '=== [2/4] DocVQA ===' &&
-        python3 -m eval.eval_docvqa_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_docvqa_divprune &&
 
         echo '=== [3/4] MathVista ===' &&
-        python3 -m eval.eval_mathvista_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_mathvista_divprune &&
 
         echo '=== [4/4] RealWorldQA ===' &&
-        python3 -m eval.eval_realworldqa_divprune --subset_ratio 0.5 &&
+        python3 -m eval.eval_realworldqa_divprune &&
 
         echo '=== All done. Results in results/divprune/ ==='
     "

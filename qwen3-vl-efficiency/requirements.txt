@@ -1,9 +1,10 @@
-torch
+torch>=2.4.0
 torchvision
-transformers
 accelerate
+transformers>=4.57.0
 datasets
 pillow
+requests
 tqdm
 numpy
 pandas
