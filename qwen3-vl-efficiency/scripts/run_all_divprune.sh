@@ -15,23 +15,15 @@
 
 export HF_HOME=$SCRATCH/hf_cache
 
-# Set LD_PRELOAD via SINGULARITYENV_ *before* singularity exec so it is injected
-# into the container by singularity itself — not inside bash -c where some singularity
-# versions reset or ignore it. Use the pip-installed nvidia cupti (ABI-matched to pip
-# torch) to beat the host cupti --nv injects.
-PIP_CUPTI="$HOME/.local/lib/python3.10/site-packages/nvidia/cuda_cupti/lib/libcupti.so.12"
-if [ -f "$PIP_CUPTI" ]; then
-    export SINGULARITYENV_LD_PRELOAD="$PIP_CUPTI"
-fi
+# Use packages installed in the overlay by install_overlay.sh.
+# PYTHONNOUSERSITE=1 prevents ~/.local from being added to sys.path,
+# eliminating all CUDA library version conflicts from the host environment.
+export SINGULARITYENV_PYTHONNOUSERSITE=1
+export SINGULARITYENV_PYTHONPATH=/ext3/packages
 
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /scratch/work/public/singularity/cuda12.6.3-cudnn9.5.1-ubuntu22.04.5.sif \
     /bin/bash -c "
-        # Belt-and-suspenders: prepend all pip nvidia lib dirs to LD_LIBRARY_PATH
-        export LD_LIBRARY_PATH=\$(ls -d \$HOME/.local/lib/python3.10/site-packages/nvidia/*/lib 2>/dev/null | tr '\n' ':'):\$LD_LIBRARY_PATH &&
-
-        echo \"[debug] LD_PRELOAD=\$LD_PRELOAD\" &&
-
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
 
         echo '=== [1/4] MMMU ===' &&
