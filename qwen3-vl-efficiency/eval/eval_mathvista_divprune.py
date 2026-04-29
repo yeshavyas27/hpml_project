@@ -197,7 +197,7 @@ def main():
     model, processor = load_model_and_processor()
 
     print(f"Loading dataset: {DATASET_HF} / {SPLIT}...")
-    dataset = load_dataset(DATASET_HF, split=SPLIT)
+    dataset = load_dataset(DATASET_HF, split=SPLIT, verification_mode="no_checks", trust_remote_code=True)
 
     if args.no_divprune:
         ratios = [None]
