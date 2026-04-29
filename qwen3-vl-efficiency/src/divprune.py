@@ -227,20 +227,26 @@ def _make_pre_language_model_hook(state: _DivPruneState):
                     pass
 
             # ── 5. Prune attention_mask ───────────────────────────────────
-            # Note: language_model.forward rebuilds the causal mask internally
-            # via create_causal_mask(inputs_embeds=...) so a 4-D mask may not
-            # be present here.  We still try to prune whatever arrives.
+            # create_causal_mask uses attention_mask.shape[-1] as kv_length when
+            # the mask is 2-D, and returns a 4-D mask as-is.  Either way, an
+            # unpruned mask causes a shape mismatch in SDPA.
+            #
+            # Safe default: None → create_causal_mask rebuilds the correct
+            # [B, 1, new_S, new_S] mask from the already-pruned inputs_embeds.
+            # We override this only when we can cleanly slice the existing mask.
+            new_kwargs["attention_mask"] = None
             att = kwargs.get("attention_mask")
             if att is not None:
                 try:
-                    if att.dim() == 4 and att.shape[-1] == seq_len and att.shape[-2] == seq_len:
+                    if att.dim() == 4 and att.shape[-2] == seq_len and att.shape[-1] == seq_len:
                         new_kwargs["attention_mask"] = att[:, :, kept_idx, :][:, :, :, kept_idx]
                     elif att.dim() == 4 and att.shape[-1] == seq_len:
                         new_kwargs["attention_mask"] = att[:, :, :, kept_idx]
                     elif att.dim() == 2 and att.shape[-1] == seq_len:
                         new_kwargs["attention_mask"] = att[:, kept_idx]
+                    # else: leave as None — create_causal_mask will rebuild
                 except Exception:
-                    pass
+                    pass  # leave as None — create_causal_mask will rebuild
 
             # ── Record stats ──────────────────────────────────────────────
             state.stats = DivPruneStats(
