@@ -7,7 +7,7 @@ from src.utils import reset_gpu_memory, get_peak_gpu_memory_mb, timed_inference
 
 RESULTS_PATH = "results/baseline/mathvista_results.jsonl"
 DATASET_NAME = "AI4Math/MathVista"
-MAX_SAMPLES = 2   # keep small for CPU testing
+MAX_SAMPLES = 100
 
 
 def generate_answer(model, processor, image, question):

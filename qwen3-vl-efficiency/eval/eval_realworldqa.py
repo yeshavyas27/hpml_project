@@ -8,7 +8,7 @@ from src.utils import reset_gpu_memory, get_peak_gpu_memory_mb, timed_inference
 
 RESULTS_PATH = "results/baseline/realworldqa_results.jsonl"
 DATASET_NAME = "xai-org/RealworldQA"
-MAX_SAMPLES = 5
+MAX_SAMPLES = 100
 
 
 def generate_answer(model, processor, image, question):

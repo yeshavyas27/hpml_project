@@ -196,7 +196,7 @@ def parse_args():
     p.add_argument("--method", required=True,
                    choices=["h2o", "streaming", "snapkv", "pyramid", "modality"])
     p.add_argument("--dataset", required=True, choices=list(DATASET_CONFIGS.keys()))
-    p.add_argument("--max_samples", type=int, default=5)
+    p.add_argument("--max_samples", type=int, default=100)
 
     # Uniform methods
     p.add_argument("--compression_ratio", type=float, default=0.5,

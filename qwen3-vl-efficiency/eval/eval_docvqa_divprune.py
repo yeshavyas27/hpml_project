@@ -102,7 +102,7 @@ def parse_args():
                         help="Single ratio to evaluate. If omitted, sweeps DEFAULT_RATIOS.")
     parser.add_argument("--sweep_ratios", type=float, nargs="+", default=DEFAULT_RATIOS)
     parser.add_argument("--no_divprune", action="store_true")
-    parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--max_samples", type=int, default=100)
     parser.add_argument("--verbose", action="store_true")
     return parser.parse_args()
 

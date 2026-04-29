@@ -6,7 +6,7 @@ from src.utils import reset_gpu_memory, get_peak_gpu_memory_mb, timed_inference
 
 
 RESULTS_PATH = "results/baseline/docvqa_results.jsonl"
-MAX_SAMPLES = 2
+MAX_SAMPLES = 100
 
 
 def generate_answer(model, processor, image, question):

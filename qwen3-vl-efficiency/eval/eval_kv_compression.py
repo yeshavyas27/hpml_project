@@ -274,8 +274,8 @@ def parse_args():
     parser.add_argument(
         "--max_samples",
         type=int,
-        default=5,
-        help="Maximum number of dataset samples to evaluate. Default: 5.",
+        default=100,
+        help="Maximum number of dataset samples to evaluate. Default: 100.",
     )
     return parser.parse_args()
 

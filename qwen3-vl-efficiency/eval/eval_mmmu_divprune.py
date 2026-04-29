@@ -113,8 +113,8 @@ def parse_args():
                              f"(default: {DEFAULT_RATIOS}).")
     parser.add_argument("--no_divprune", action="store_true",
                         help="Disable DivPrune (baseline run only, no sweep).")
-    parser.add_argument("--max_samples", type=int, default=None,
-                        help="Max samples to evaluate (default: full validation set).")
+    parser.add_argument("--max_samples", type=int, default=100,
+                        help="Max samples to evaluate (default: 100).")
     parser.add_argument("--verbose", action="store_true",
                         help="Print per-sample DivPrune info.")
     return parser.parse_args()
