@@ -26,17 +26,19 @@ singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /bin/bash -c "
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
 
-        echo '=== [1/4] MMMU ===' &&
-        python3 -m eval.eval_mmmu_divprune &&
-
-        echo '=== [2/4] DocVQA ===' &&
-        python3 -m eval.eval_docvqa_divprune &&
-
-        echo '=== [3/4] MathVista ===' &&
-        python3 -m eval.eval_mathvista_divprune &&
-
-        echo '=== [4/4] RealWorldQA ===' &&
-        python3 -m eval.eval_realworldqa_divprune &&
+        for RATIO in 0.5 0.3 0.2; do
+            echo "=== Ratio \$RATIO ===" &&
+            echo "  [1/4] MMMU" &&
+            python3 -m eval.eval_mmmu_divprune --subset_ratio \$RATIO &&
+            echo "  [2/4] DocVQA" &&
+            python3 -m eval.eval_docvqa_divprune --subset_ratio \$RATIO &&
+            echo "  [3/4] MathVista" &&
+            python3 -m eval.eval_mathvista_divprune --subset_ratio \$RATIO &&
+            echo "  [4/4] RealWorldQA" &&
+            python3 -m eval.eval_realworldqa_divprune --subset_ratio \$RATIO &&
+            echo "  Done ratio \$RATIO" ||
+            echo "  FAILED at ratio \$RATIO — continuing"
+        done &&
 
         echo '=== All done. Results in results/divprune/ ==='
     "

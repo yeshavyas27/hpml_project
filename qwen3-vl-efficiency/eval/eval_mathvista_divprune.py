@@ -91,7 +91,7 @@ def generate_with_timing(model, processor, image, question: str):
     return prediction, prefill_ms, decode_ms, num_tokens, throughput
 
 
-DEFAULT_RATIOS = [0.1, 0.2, 0.3, 0.5]
+DEFAULT_RATIOS = [0.2, 0.3, 0.5]
 
 
 def parse_args():
