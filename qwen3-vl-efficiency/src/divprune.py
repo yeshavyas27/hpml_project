@@ -226,27 +226,27 @@ def _make_pre_language_model_hook(state: _DivPruneState):
                 except Exception:
                     pass
 
-            # ── 5. Prune attention_mask ───────────────────────────────────
-            # create_causal_mask uses attention_mask.shape[-1] as kv_length when
-            # the mask is 2-D, and returns a 4-D mask as-is.  Either way, an
-            # unpruned mask causes a shape mismatch in SDPA.
-            #
-            # Safe default: None → create_causal_mask rebuilds the correct
-            # [B, 1, new_S, new_S] mask from the already-pruned inputs_embeds.
-            # We override this only when we can cleanly slice the existing mask.
-            new_kwargs["attention_mask"] = None
+            # ── 5. Build explicit causal mask for pruned sequence ────────
+            # The 4D [B,1,S,S] mask is pre-built in prepare_inputs_for_generation
+            # using the original S=527.  Slicing it fails silently, and passing
+            # None still lets create_causal_mask use the StaticCache capacity
+            # (also 527) as kv_length.  The only reliable fix: build our own
+            # [B, 1, new_S, new_S] causal float mask so create_causal_mask hits
+            # the 4-D early-exit path and returns it unchanged.
             att = kwargs.get("attention_mask")
-            if att is not None:
-                try:
-                    if att.dim() == 4 and att.shape[-2] == seq_len and att.shape[-1] == seq_len:
-                        new_kwargs["attention_mask"] = att[:, :, kept_idx, :][:, :, :, kept_idx]
-                    elif att.dim() == 4 and att.shape[-1] == seq_len:
-                        new_kwargs["attention_mask"] = att[:, :, :, kept_idx]
-                    elif att.dim() == 2 and att.shape[-1] == seq_len:
-                        new_kwargs["attention_mask"] = att[:, kept_idx]
-                    # else: leave as None — create_causal_mask will rebuild
-                except Exception:
-                    pass  # leave as None — create_causal_mask will rebuild
+            att_dtype = (att.dtype
+                         if isinstance(att, torch.Tensor) and att.dim() == 4
+                         else inputs_embeds.dtype)
+            causal_mask = torch.zeros(
+                B, 1, new_S, new_S, dtype=att_dtype, device=inputs_embeds.device
+            )
+            # upper triangle (future positions) → -inf; lower + diagonal → 0
+            causal_mask.masked_fill_(
+                torch.ones(new_S, new_S, dtype=torch.bool, device=inputs_embeds.device)
+                      .triu(diagonal=1),
+                float("-inf"),
+            )
+            new_kwargs["attention_mask"] = causal_mask
 
             # ── Record stats ──────────────────────────────────────────────
             state.stats = DivPruneStats(
