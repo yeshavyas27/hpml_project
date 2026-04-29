@@ -17,7 +17,7 @@ import json
 import argparse
 from threading import Thread
 
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_config_names
 from transformers import TextIteratorStreamer
 
 from src.load_model import load_model_and_processor
@@ -113,7 +113,7 @@ def parse_args():
                              f"(default: {DEFAULT_RATIOS}).")
     parser.add_argument("--no_divprune", action="store_true",
                         help="Disable DivPrune (baseline run only, no sweep).")
-    parser.add_argument("--max_samples", type=int, default=100,
+    parser.add_argument("--max_samples", type=int, default=1000,
                         help="Max samples to evaluate (default: 100).")
     parser.add_argument("--verbose", action="store_true",
                         help="Print per-sample DivPrune info.")
@@ -222,7 +222,24 @@ def main():
     model, processor = load_model_and_processor()
 
     print(f"Loading dataset: {DATASET_HF} / {SUBSET} / {SPLIT}...")
-    dataset = load_dataset(DATASET_HF, SUBSET, split=SPLIT, trust_remote_code=True, verification_mode="no_checks")
+    # Validate that the requested subset/config exists on the remote dataset.
+    try:
+        available_configs = get_dataset_config_names(DATASET_HF)
+    except Exception:
+        available_configs = None
+
+    if available_configs and SUBSET not in available_configs:
+        print(
+            f"Warning: requested subset '{SUBSET}' not found in dataset configs: {available_configs}."
+            " Attempting to load default config (no config argument)."
+        )
+        dataset = load_dataset(
+            DATASET_HF, split=SPLIT, trust_remote_code=True, verification_mode="no_checks"
+        )
+    else:
+        dataset = load_dataset(
+            DATASET_HF, SUBSET, split=SPLIT, trust_remote_code=True, verification_mode="no_checks"
+        )
 
     if args.no_divprune:
         ratios = [None]

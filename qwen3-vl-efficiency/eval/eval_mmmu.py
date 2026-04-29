@@ -1,6 +1,6 @@
 import os
 import json
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_config_names
 from src.load_model import load_model_and_processor
 from src.utils import reset_gpu_memory, get_peak_gpu_memory_mb, timed_inference
 
@@ -52,7 +52,20 @@ def main():
     model, processor = load_model_and_processor()
 
     print("Loading dataset...")
-    dataset = load_dataset("MMMU/MMMU", "Math", split="validation")
+    # Validate that the requested subset/config exists on the remote dataset.
+    try:
+        available_configs = get_dataset_config_names("MMMU/MMMU")
+    except Exception:
+        available_configs = None
+
+    if available_configs and "Math" not in available_configs:
+        print(
+            f"Warning: requested subset 'Math' not found in dataset configs: {available_configs}."
+            " Attempting to load default config (no config argument)."
+        )
+        dataset = load_dataset("MMMU/MMMU", split="validation")
+    else:
+        dataset = load_dataset("MMMU/MMMU", "Math", split="validation")
 
     print(f"Running first {MAX_SAMPLES} samples...")
 
