@@ -18,6 +18,7 @@ export HF_HOME=$SCRATCH/hf_cache
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /scratch/work/public/singularity/cuda12.6.3-cudnn9.5.1-ubuntu22.04.5.sif \
     /bin/bash -c "
+        export LD_LIBRARY_PATH=\$(ls -d ~/.local/lib/python3.10/site-packages/nvidia/*/lib 2>/dev/null | tr '\n' ':'):\$LD_LIBRARY_PATH &&
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
         python3 -m eval.eval_realworldqa_divprune
     "
