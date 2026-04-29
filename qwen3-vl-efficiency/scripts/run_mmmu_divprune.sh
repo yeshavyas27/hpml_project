@@ -18,7 +18,7 @@ export HF_HOME=$SCRATCH/hf_cache
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /scratch/work/public/singularity/cuda12.6.3-cudnn9.5.1-ubuntu22.04.5.sif \
     /bin/bash -c "
-        export LD_PRELOAD=/usr/local/cuda-12.6/targets/x86_64-linux/lib/libcupti.so.12 &&
+        export LD_PRELOAD=/usr/local/cuda-12.6/targets/x86_64-linux/lib/libcudart.so.12:/usr/local/cuda-12.6/targets/x86_64-linux/lib/libcupti.so.12 &&
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
         python3 -m eval.eval_mmmu_divprune
     "
