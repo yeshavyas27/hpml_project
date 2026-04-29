@@ -8,14 +8,18 @@ cosine distance (max-min selection). Unlike FastV (which prunes the KV cache
 after layer K based on attention importance), DivPrune prunes visual tokens
 BEFORE the first LLM layer, maximising feature coverage.
 
-Hook point: register_forward_pre_hook on language_model.layers[0].
-  - args[0] = hidden_states [B, seq_len, hidden_dim]: merged visual+text embeds
-    output by Qwen3VLModel (after ViT, merger, deepstack, embed_tokens)
-  - The hook extracts image token embeddings, runs DivPrune greedy selection,
-    removes non-selected image tokens from hidden_states, position_ids,
-    position_embeddings (cos/sin), and attention_mask, then returns the
-    shortened tensors as (new_args, new_kwargs).
-  - All 36 LLM layers then process the pruned sequence natively.
+Hook point: register_forward_pre_hook on language_model (the inner Qwen3_VLModel).
+  - Fires before any decoder layer or deepstack call.
+  - Prunes inputs_embeds [B,S,D], visual_pos_masks [B,S], and every tensor in
+    deepstack_visual_embeds [N_visual,D] to reflect only the kept visual tokens.
+  - Also prunes position_ids and attention_mask to match the new sequence length.
+  - All decoder layers and _deepstack_process calls then see consistent shapes.
+
+Why language_model, not layers[0]:
+  Qwen3-VL's _deepstack_process runs AFTER each decoder layer and re-indexes
+  hidden_states using visual_pos_masks.  Hooking at layers[0] only pruned
+  hidden_states; visual_pos_masks and deepstack_visual_embeds kept their original
+  length, causing an IndexError on all subsequent _deepstack_process calls.
 
 === DivPrune Algorithm ===
 
@@ -131,35 +135,42 @@ def _divprune_select(features: torch.Tensor, n_keep: int) -> torch.Tensor:
 
 
 # ---------------------------------------------------------------------------
-# Pre-layer-0 hook
+# Pre-language-model hook
 # ---------------------------------------------------------------------------
 
-def _make_pre_layer0_hook(state: _DivPruneState):
+def _make_pre_language_model_hook(state: _DivPruneState):
     """
-    Returns a register_forward_pre_hook callable for language_model.layers[0].
+    Returns a register_forward_pre_hook callable for language_model.
 
-    On the prefill pass, prunes image tokens from:
-      hidden_states   (args[0])
-      position_ids    (kwargs, [4,B,S] MRoPE or [B,S])
-      position_embeddings  (kwargs, (cos,sin) tuple)
-      attention_mask  (kwargs, 2-D or 4-D causal mask)
+    Hooked at the language_model level (not layers[0]) so that both
+    inputs_embeds and deepstack tensors (visual_pos_masks,
+    deepstack_visual_embeds) are pruned before any decoder layer or
+    _deepstack_process call sees them.
+
+    Pruned kwargs:
+      inputs_embeds          [B, S, D]          → [B, new_S, D]
+      visual_pos_masks       [B, S]             → [B, new_S]
+      deepstack_visual_embeds list[[N_vis, D]]  → list[[n_keep, D]]
+      position_ids           [4, B, S]          → [4, B, new_S]
+      attention_mask         [B,1,S,S] or [B,S] → sliced accordingly
     """
     def _hook(module, args, kwargs):
-        # Only fire once per generate() call, and only on prefill
+        # Only fire once per generate() call, and only on the prefill pass.
         if state.pruning_done or state.image_token_positions is None:
             return args, kwargs
 
-        if not args or not isinstance(args[0], torch.Tensor):
+        # inputs_embeds is always passed as a kwarg when visual tokens are present.
+        inputs_embeds = kwargs.get("inputs_embeds")
+        if inputs_embeds is None or not isinstance(inputs_embeds, torch.Tensor):
             return args, kwargs
 
-        hidden_states = args[0]                         # [B, S, D]
-        B, seq_len, hidden_dim = hidden_states.shape
+        B, seq_len, hidden_dim = inputs_embeds.shape
 
         image_mask = state.image_token_positions        # [B, orig_S]
         if image_mask.shape[1] > seq_len:
             image_mask = image_mask[:, :seq_len]
         elif image_mask.shape[1] < seq_len:
-            # decode step — skip
+            # Decode step (seq_len == 1) — skip.
             return args, kwargs
 
         if not image_mask.any():
@@ -168,28 +179,42 @@ def _make_pre_layer0_hook(state: _DivPruneState):
 
         # ── Single-batch fast path (standard eval loop) ──────────────────
         if B == 1:
-            img_pos = torch.where(image_mask[0, :seq_len])[0]  # [N_img]
+            img_pos = torch.where(image_mask[0])[0]     # [N_img] global positions
             n_img = img_pos.numel()
             n_keep = max(1, int(round(n_img * state.config.divprune_r)))
 
             # DivPrune greedy selection
-            img_feats = hidden_states[0, img_pos]               # [N_img, D]
-            sel_local = _divprune_select(img_feats, n_keep)     # [n_keep]
-            sel_pos = img_pos[sel_local]                        # global positions
+            img_feats = inputs_embeds[0, img_pos]        # [N_img, D]
+            sel_local = _divprune_select(img_feats, n_keep)  # [n_keep] into img_pos
+            sel_pos = img_pos[sel_local]                 # global positions kept
 
-            # keep_mask: True = keep this position
-            keep_mask = (~image_mask[0, :seq_len]).clone()      # all non-image = True
+            # keep_mask: True = keep this position in the sequence
+            keep_mask = (~image_mask[0]).clone()         # all non-image = True
             keep_mask[sel_pos] = True
-            kept_idx = torch.where(keep_mask)[0]                # [new_S]
+            kept_idx = torch.where(keep_mask)[0]         # [new_S]
             new_S = kept_idx.numel()
-
-            # ── Prune hidden_states ──────────────────────────────────────
-            new_hs = hidden_states[:, kept_idx, :]
-            new_args = (new_hs,) + args[1:]
 
             new_kwargs = dict(kwargs)
 
-            # ── Prune position_ids ───────────────────────────────────────
+            # ── 1. Prune inputs_embeds ────────────────────────────────────
+            new_kwargs["inputs_embeds"] = inputs_embeds[:, kept_idx, :]
+
+            # ── 2. Prune visual_pos_masks [B, S] → [B, new_S] ───────────
+            vpm = kwargs.get("visual_pos_masks")
+            if vpm is not None:
+                new_kwargs["visual_pos_masks"] = vpm[:, kept_idx]
+
+            # ── 3. Prune deepstack_visual_embeds ─────────────────────────
+            # Each element: [N_visual, D] where N_visual = n_img.
+            # sel_local_sorted: sorted indices (0..n_img-1) of kept visual tokens.
+            dve = kwargs.get("deepstack_visual_embeds")
+            if dve is not None:
+                sel_local_sorted = sel_local.sort().values
+                new_kwargs["deepstack_visual_embeds"] = [
+                    embed[sel_local_sorted] for embed in dve
+                ]
+
+            # ── 4. Prune position_ids ─────────────────────────────────────
             pid = kwargs.get("position_ids")
             if pid is not None:
                 try:
@@ -201,26 +226,14 @@ def _make_pre_layer0_hook(state: _DivPruneState):
                 except Exception:
                     pass
 
-            # ── Prune position_embeddings (cos, sin) ────────────────────
-            pe = kwargs.get("position_embeddings")
-            if pe is not None:
-                try:
-                    cos, sin = pe
-                    # Typical shapes: [B, S, head_dim//2] or [1, S, head_dim//2]
-                    if cos.shape[-2] == seq_len:
-                        new_kwargs["position_embeddings"] = (
-                            cos[..., kept_idx, :],
-                            sin[..., kept_idx, :],
-                        )
-                except Exception:
-                    pass
-
-            # ── Prune attention_mask ─────────────────────────────────────
+            # ── 5. Prune attention_mask ───────────────────────────────────
+            # Note: language_model.forward rebuilds the causal mask internally
+            # via create_causal_mask(inputs_embeds=...) so a 4-D mask may not
+            # be present here.  We still try to prune whatever arrives.
             att = kwargs.get("attention_mask")
             if att is not None:
                 try:
                     if att.dim() == 4 and att.shape[-1] == seq_len and att.shape[-2] == seq_len:
-                        # causal mask [B,1,S,S]
                         new_kwargs["attention_mask"] = att[:, :, kept_idx, :][:, :, :, kept_idx]
                     elif att.dim() == 4 and att.shape[-1] == seq_len:
                         new_kwargs["attention_mask"] = att[:, :, :, kept_idx]
@@ -229,7 +242,7 @@ def _make_pre_layer0_hook(state: _DivPruneState):
                 except Exception:
                     pass
 
-            # ── Record stats ─────────────────────────────────────────────
+            # ── Record stats ──────────────────────────────────────────────
             state.stats = DivPruneStats(
                 pruning_applied=True,
                 total_image_tokens=n_img,
@@ -250,7 +263,7 @@ def _make_pre_layer0_hook(state: _DivPruneState):
                     f"({s.compression_ratio:.1%})"
                 )
 
-            return new_args, new_kwargs
+            return args, new_kwargs
 
         # ── Multi-batch fallback (skip pruning) ──────────────────────────
         state.pruning_done = True
@@ -270,9 +283,9 @@ def apply_divprune_to_qwen(model, config: DivPruneConfig):
     Non-invasive: does NOT patch any forward() method.
 
     Changes:
-      - language_model.layers[0] : pre-forward hook (with_kwargs=True)
-      - model.generate            : wrapped to reset state + capture input_ids
-      - model._divprune_*         : bookkeeping attributes
+      - language_model : pre-forward hook (with_kwargs=True)
+      - model.generate : wrapped to reset state + capture input_ids
+      - model._divprune_* : bookkeeping attributes
 
     Returns the same model, patched in-place.
     """
@@ -284,12 +297,11 @@ def apply_divprune_to_qwen(model, config: DivPruneConfig):
         return model
 
     lang_model = model.model.language_model
-    layers = lang_model.layers
 
     state = _DivPruneState(config)
 
-    hook_handle = layers[0].register_forward_pre_hook(
-        _make_pre_layer0_hook(state),
+    hook_handle = lang_model.register_forward_pre_hook(
+        _make_pre_language_model_hook(state),
         with_kwargs=True,
     )
 
