@@ -1,0 +1,12 @@
+torch>=2.4.0
+torchvision
+accelerate
+transformers>=4.57.0
+datasets
+pillow
+requests
+tqdm
+numpy
+pandas
+matplotlib
+kvpress
