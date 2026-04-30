@@ -20,5 +20,28 @@ singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /bin/bash -c "
         export LD_LIBRARY_PATH=\$(ls -d ~/.local/lib/python3.10/site-packages/nvidia/*/lib 2>/dev/null | tr '\n' ':'):\$LD_LIBRARY_PATH &&
         cd $SCRATCH/hpml_project/qwen3-vl-efficiency &&
-        python3 -m eval.eval_mmmu_divprune
+        echo '=== Baseline ===' &&
+        python3 -m eval.eval_mmmu_divprune \
+            --no_divprune \
+            --max_samples 1000 \
+            --output results/divprune/mmmu_results_baseline.json \
+            --metrics_output results/divprune/inference_metrics_baseline.json &&
+        echo '=== DivPrune r=0.2 ===' &&
+        python3 -m eval.eval_mmmu_divprune \
+            --subset_ratio 0.2 \
+            --max_samples 1000 \
+            --output results/divprune/mmmu_results_r0p20.json \
+            --metrics_output results/divprune/inference_metrics_r0p20.json &&
+        echo '=== DivPrune r=0.3 ===' &&
+        python3 -m eval.eval_mmmu_divprune \
+            --subset_ratio 0.3 \
+            --max_samples 1000 \
+            --output results/divprune/mmmu_results_r0p30.json \
+            --metrics_output results/divprune/inference_metrics_r0p30.json &&
+        echo '=== DivPrune r=0.5 ===' &&
+        python3 -m eval.eval_mmmu_divprune \
+            --subset_ratio 0.5 \
+            --max_samples 1000 \
+            --output results/divprune/mmmu_results_r0p50.json \
+            --metrics_output results/divprune/inference_metrics_r0p50.json
     "
