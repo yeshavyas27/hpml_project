@@ -14,6 +14,11 @@
 #SBATCH --mail-user=ykv209@nyu.edu
 
 export HF_HOME=$SCRATCH/hf_cache
+export HF_HOME=$SCRATCH/hf_cache
+export SINGULARITYENV_PYTHONNOUSERSITE=1
+export SINGULARITYENV_PYTHONPATH=/ext3/packages
+export SINGULARITYENV_PYTHONUNBUFFERED=1
+export SINGULARITYENV_HF_TOKEN=$HF_TOKEN
 
 singularity exec --nv --overlay $SCRATCH/overlay.ext3 \
     /scratch/work/public/singularity/cuda12.6.3-cudnn9.5.1-ubuntu22.04.5.sif \
